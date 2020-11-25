@@ -27,13 +27,13 @@
 
       integer :: i,j,k,l,n,m,r,z,v,w,a
       integer :: num,i_dum,cont_num,cont_num2,point
-      integer, parameter :: nmax=3 !calcuration_number !about 20e-6[s]
+      integer, parameter :: nmax=1000 !calcuration_number !about 20e-6[s]
       integer, parameter :: divx=int(100*fb/f) !cell_division_number
       integer, parameter :: divp=10 !cell_division_number
       integer, parameter :: divt=divx*1.1 !time_division_number
       integer, parameter :: imax=int(300*fb/f)+1 !cell_number
 
-      integer, parameter :: sout=1000 !output_interval
+      integer, parameter :: sout=100 !output_interval
       integer, parameter :: lim_out=5001 !output_limit(n/sout)
       integer, parameter :: datamax=1000 !number_of_input_data
 
