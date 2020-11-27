@@ -33,7 +33,7 @@
       integer, parameter :: divt=divx*1.1 !time_division_number
       integer, parameter :: imax=int(300*fb/f)+1 !cell_number
 
-      integer, parameter :: sout=100 !output_interval
+      integer, parameter :: sout=10 !output_interval
       integer, parameter :: lim_out=5001 !output_limit(n/sout)
       integer, parameter :: datamax=1000 !number_of_input_data
 
