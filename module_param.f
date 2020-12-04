@@ -4,8 +4,8 @@
 
       integer,parameter ::xmax=400
       integer,parameter ::ymax=400
-      integer,parameter ::nmax=100
-      integer,parameter ::sout=10
+      integer,parameter ::nmax=1000
+      integer,parameter ::sout=100
       real(8), parameter :: pi=4.0d0*datan(1.0d0)
       real(8), parameter :: bol=1.38064852d-23 ![J/K]
       real(8), parameter :: ee=1.6021767208d-19 ![As]

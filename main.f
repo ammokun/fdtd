@@ -1,5 +1,6 @@
         program main
         use module_param
+        use omp_lib
         implicit none
 
 
@@ -13,10 +14,11 @@
 c        real(8) :: C_ez, C_ezlx, C_ezly, C_hxly, C_hylx
 
         integer :: t_1, t_2 ,count_per_s,s
+        double precision :: t_start=0d0,t_end=0d0
         real(8) :: calc_time
         character(50) :: filename
-
         
+        !$ call omp_num_threads(4) 
 
         t=0d0
 
@@ -26,6 +28,9 @@ c        real(8) :: C_ez, C_ezlx, C_ezly, C_hxly, C_hylx
             Ez(i,j)=0.0d0
             Hx(i,j)=0.0d0
             Hy(i,j)=0.0d0
+            Ez_o(i,j)=0.0d0
+            Hx_o(i,j)=0.0d0
+            Hy_o(i,j)=0.0d0
             end do
         end do
 
@@ -55,10 +60,9 @@ c        real(8) :: C_ez, C_ezlx, C_ezly, C_hxly, C_hylx
         write(*,*) "C_hylx", C_hylx
         write(*,*) "dt, dx, 1/f", dt, dx, 1d0/f
 
-
-        do n=1,nmax
-
-        call system_clock(t_1, count_per_s)
+        t_start=omp_get_wtime()
+        do n=1,nmax       
+            call system_clock(t_1,count_per_s)
 c            do m=1,divt !FDTD loop      
         ! initial
 c            Ez(xmax/2,ymax/2)=amp*exp(-(4/dt)**2*(t-2*dt)**2)
@@ -84,13 +88,15 @@ c            end do
 
             call Ez_field(Ez,Hx,Hy,Ez_o)
             
+            !$OMP parallel do private(i,j)
             do j=1,ymax
                 do i=1,xmax
                     Ez(i,j)=Ez_o(i,j)
                 end do
             end do
-
+            !$OMP end parallel do
                 !Absorption
+
 
             do j=2,ymax-1
 
@@ -128,28 +134,18 @@ c            end do
             end do
             t=t+dt/2
             !H field
-            do j=1,ymax-1
-                do i=1,xmax
-                    Hx(i,j)=Hx(i,j)-C_hxly*(Ez(i,j+1)-Ez(i,j))
-                end do
-            end do  
 
+            call Hx_field(Ez,Hx,Hx_o)
+            call Hy_field(Ez,Hy,Hy_o)
+
+            !$OMP parallel do private(i,j)
             do j=1,ymax
-                do i=1,xmax-1
-    
-                    Hy(i,j)=Hy(i,j)+C_hylx*(Ez(i+1,j)-Ez(i,j))
-                    
+                do i=1,xmax
+                    Hx(i,j)=Hx_o(i,j)
+                    Hy(i,j)=Hy_o(i,j)
                 end do
             end do
-c            call Hx_field(Ez,Hx,Hx_o)
-c            call Hy_field(Ez,Hy,Hy_o)
-
-c            do j=1,ymax
-c                do i=1,xmax
-c                    Hx(i,j)=Hx_o(i,j)
-c                    Hy(i,j)=Hy_o(i,j)
-c                end do
-c            end do
+            !$OMP end parallel do
             t=t+dt/2
 
 c        end do !end FDTD loop
@@ -185,11 +181,14 @@ c            end if
             close(10)
             end if
 
-        end do    
+        end do 
+
+        t_end=omp_get_wtime()
+        write(*,*) "Total time=",t_end-t_start
+
 100     format(i15.4,i15.4,1h,100(e15.7,1h,))
 101     format(100(e15.7,1h,))
         
-        write(*,*) n
         end program main
  
         subroutine Ez_field(Ez_i, Hx_i, Hy_i,Ez_o)
@@ -200,15 +199,18 @@ c            end if
         real(8), intent(in) :: Hx_i(1:xmax,1:ymax)
         real(8), intent(in) :: Hy_i(1:xmax,1:ymax)
         real(8), intent(out) :: Ez_o(1:xmax,1:ymax)  
-
-        !$OMP paralell do j=2,ymax
+            
+        !$OMP parallel do private(i,j)
+        do j=2,ymax
+  
             do i=2,xmax
                             
             Ez_o(i,j)=C_ez*Ez_i(i,j)
      &             +C_ezlx*(Hy_i(i,j)-Hy_i(i-1,j))
      &              -C_ezly*(Hx_i(i,j)-Hx_i(i,j-1))
             end do
-        !$OMP parallel end do
+         end do
+        !$OMP end parallel do
         end subroutine Ez_field
 
         subroutine Hx_field(Ez_i,Hx_i,Hx_o)
@@ -218,13 +220,14 @@ c            end if
         real(8), intent(in) :: Ez_i(1:xmax,1:ymax) 
         real(8), intent(in) :: Hx_i(1:xmax,1:ymax)
         real(8), intent(out) :: Hx_o(1:xmax,1:ymax)  
-
+        
+        !$OMP parallel do private(i,j)
         do j=1,ymax-1
             do i=1,xmax
                 Hx_o(i,j)=Hx_i(i,j)-C_hxly*(Ez_i(i,j+1)-Ez_i(i,j))
             end do
         end do  
-
+        !$OMP end parallel do
         end subroutine Hx_field
 
 
@@ -236,12 +239,13 @@ c            end if
         real(8), intent(in) :: Hy_i(1:xmax,1:ymax)
         real(8), intent(out) :: Hy_o(1:xmax,1:ymax)  
 
-        do j=1,ymax
+        !$OMP parallel do private(i,j)
+        do j=1,ymax 
             do i=1,xmax-1
 
                 Hy_o(i,j)=Hy_i(i,j)+C_hylx*(Ez_i(i+1,j)-Ez_i(i,j))
                 
             end do
         end do
-    
+        !$OMP end parallel do
         end subroutine Hy_field
