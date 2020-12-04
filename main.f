@@ -1,29 +1,17 @@
         program main
-        
-        integer,parameter ::xmax=100
-        integer,parameter ::ymax=100
-        integer,parameter ::nmax=1000
-        integer,parameter ::sout=10
-        real(8), parameter :: pi=4.0d0*datan(1.0d0)
-        real(8), parameter :: bol=1.38064852d-23 ![J/K]
-        real(8), parameter :: ee=1.6021767208d-19 ![As]
+        use module_param
+        implicit none
 
-        real(8), parameter :: f=170d9
-        real(8), parameter :: sigma=0.0d0
-        real(8), parameter :: mu0=1.25663706d-6
-        real(8), parameter :: eps0=8.85418782d-12
-        real(8), parameter :: cc=2.99792458d8
-        real(8), parameter :: amp =1.0d6
 
        ! TM
         real(8),dimension(1:xmax,1:ymax):: Ez, Hx, Hy
+        real(8),dimension(1:xmax,1:ymax):: Ez_o, Hx_o, Hy_o
         real(8),dimension(1:4,1:ymax) :: Ezx
         real(8),dimension(1:4,1:xmax) :: Ezy
-        real(8) :: t dt dx
+        real(8) ::t
 
-        real(8) :: C_ez, C_ezlx, C_ezly, C_hxly, C_hylx
+c        real(8) :: C_ez, C_ezlx, C_ezly, C_hxly, C_hylx
 
-        integer :: i, j, k, n,m
         integer :: t_1, t_2 ,count_per_s,s
         real(8) :: calc_time
         character(50) :: filename
@@ -31,9 +19,7 @@
         
 
         t=0d0
-        dx=cc/f/10d0
-        dt = 0.5d0 * 1/sqrt(2d0/dx**2)/cc
-c        dt = 1d0/f/divt
+
         
         do j=1,ymax
             do i=1,xmax
@@ -60,12 +46,7 @@ c        dt = 1d0/f/divt
 
         end do
 
-        C_ez=(1-sigma*dt/(2*eps0))/(1+sigma*dt/(2*eps0))
-        C_ezlx=(dt/eps0)/((1+sigma*dt/(2*eps0))*dx)
-        C_ezly=(dt/eps0)/((1+sigma*dt/(2*eps0))*dx) !dx=dy
 
-        C_hxly=dt/(mu0*dx) !dy=dx
-        C_hylx=dt/(mu0*dx)
 
         write(*,*) "C_ez=", C_ez
         write(*,*) "C_ezlx",  C_ezlx
@@ -101,18 +82,15 @@ c            end do
 
                 ! E field
 
-
-            do j=2,ymax
-                do i=2,xmax
-                                        
-                Ez(i,j)=C_ez*Ez(i,j)
-     &              +C_ezlx*(Hy(i,j)-Hy(i-1,j))
-     &              -C_ezly*(Hx(i,j)-Hx(i,j-1))
+            call Ez_field(Ez,Hx,Hy,Ez_o)
+            
+            do j=1,ymax
+                do i=1,xmax
+                    Ez(i,j)=Ez_o(i,j)
                 end do
             end do
 
-
-            !Absorptin
+                !Absorption
 
             do j=2,ymax-1
 
@@ -150,19 +128,28 @@ c            end do
             end do
             t=t+dt/2
             !H field
-
             do j=1,ymax-1
                 do i=1,xmax
                     Hx(i,j)=Hx(i,j)-C_hxly*(Ez(i,j+1)-Ez(i,j))
                 end do
             end do  
+
             do j=1,ymax
                 do i=1,xmax-1
-
+    
                     Hy(i,j)=Hy(i,j)+C_hylx*(Ez(i+1,j)-Ez(i,j))
                     
                 end do
-            end do  
+            end do
+c            call Hx_field(Ez,Hx,Hx_o)
+c            call Hy_field(Ez,Hy,Hy_o)
+
+c            do j=1,ymax
+c                do i=1,xmax
+c                    Hx(i,j)=Hx_o(i,j)
+c                    Hy(i,j)=Hy_o(i,j)
+c                end do
+c            end do
             t=t+dt/2
 
 c        end do !end FDTD loop
@@ -204,3 +191,57 @@ c            end if
         
         write(*,*) n
         end program main
+ 
+        subroutine Ez_field(Ez_i, Hx_i, Hy_i,Ez_o)
+        use module_param
+        implicit none
+
+        real(8), intent(in) :: Ez_i(1:xmax,1:ymax) 
+        real(8), intent(in) :: Hx_i(1:xmax,1:ymax)
+        real(8), intent(in) :: Hy_i(1:xmax,1:ymax)
+        real(8), intent(out) :: Ez_o(1:xmax,1:ymax)  
+
+        !$OMP paralell do j=2,ymax
+            do i=2,xmax
+                            
+            Ez_o(i,j)=C_ez*Ez_i(i,j)
+     &             +C_ezlx*(Hy_i(i,j)-Hy_i(i-1,j))
+     &              -C_ezly*(Hx_i(i,j)-Hx_i(i,j-1))
+            end do
+        !$OMP parallel end do
+        end subroutine Ez_field
+
+        subroutine Hx_field(Ez_i,Hx_i,Hx_o)
+        use module_param
+        implicit none
+
+        real(8), intent(in) :: Ez_i(1:xmax,1:ymax) 
+        real(8), intent(in) :: Hx_i(1:xmax,1:ymax)
+        real(8), intent(out) :: Hx_o(1:xmax,1:ymax)  
+
+        do j=1,ymax-1
+            do i=1,xmax
+                Hx_o(i,j)=Hx_i(i,j)-C_hxly*(Ez_i(i,j+1)-Ez_i(i,j))
+            end do
+        end do  
+
+        end subroutine Hx_field
+
+
+        subroutine Hy_field(Ez_i,Hy_i,Hy_o)
+        use module_param
+        implicit none
+    
+        real(8), intent(in) :: Ez_i(1:xmax,1:ymax) 
+        real(8), intent(in) :: Hy_i(1:xmax,1:ymax)
+        real(8), intent(out) :: Hy_o(1:xmax,1:ymax)  
+
+        do j=1,ymax
+            do i=1,xmax-1
+
+                Hy_o(i,j)=Hy_i(i,j)+C_hylx*(Ez_i(i+1,j)-Ez_i(i,j))
+                
+            end do
+        end do
+    
+        end subroutine Hy_field
